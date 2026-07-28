@@ -681,7 +681,11 @@ async function processFile(file) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newData),
     });
-    if (!r.ok) throw new Error('El servidor devolvió ' + r.status);
+    if (!r.ok) {
+      let detail = '';
+      try { detail = (await r.json()).error || ''; } catch (e) {}
+      throw new Error('El servidor devolvió ' + r.status + (detail ? ' — ' + detail : ''));
+    }
     DATA = newData;
     await cronoLoadRemote();
     renderAll();
