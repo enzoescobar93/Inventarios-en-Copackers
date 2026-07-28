@@ -1,0 +1,12 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+  command = "npm install"
+
+[functions]
+  node_bundler = "esbuild"
+
+# El HTML sube el Excel como JSON de varios cientos de KB; subimos el límite de body
+# para que no lo corte una función chica.
+[functions."upload-tablero"]
+  timeout = 30

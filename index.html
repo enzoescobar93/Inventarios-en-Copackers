@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Inventarios en Copackers — 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="js/extract.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;--bg2:#f7f7f5;--bg3:#f0efec;
+  --text:#1a1a18;--text2:#5a5a56;--text3:#8a8a84;
+  --border:#e0dfd8;--border2:#c8c7be;
+  --rad:8px;--rad-lg:12px;
+  --red:#e24b4a;--red-bg:#fcebeb;--red-text:#791f1f;
+  --amber:#ef9f27;--amber-bg:#faeeda;--amber-text:#633806;
+  --green:#639922;--green-bg:#eaf3de;--green-text:#27500a;
+  --blue:#185fa5;--blue-bg:#e6f1fb;--blue-text:#042c53;
+  --navy:#0c2d52;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#1c1c1a;--bg2:#252523;--bg3:#2e2e2b;
+  --text:#f0efea;--text2:#a8a89e;--text3:#6a6a62;
+  --border:#3a3a36;--border2:#4e4e48;
+  --red-bg:#2a1515;--red-text:#f09595;
+  --amber-bg:#2a1e08;--amber-text:#fac775;
+  --green-bg:#0f1e06;--green-text:#c0dd97;
+  --blue-bg:#04182e;--blue-text:#b5d4f4;
+}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);font-size:14px;line-height:1.5}
+.shell{max-width:1180px;margin:0 auto;padding:24px 16px 60px}
+.header{background:var(--navy);color:#fff;border-radius:var(--rad-lg);padding:22px 26px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.header-title{font-size:19px;font-weight:600;letter-spacing:.2px}
+.header-sub{font-size:12px;color:#c3d3e6;margin-top:5px}
+.header-meta{text-align:right;font-size:12px;color:#c3d3e6}
+.header-meta strong{display:block;font-size:14px;font-weight:600;color:#fff}
+.copacker-bar{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rad-lg);padding:14px 20px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.copacker-bar label{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.3px}
+.copacker-bar select{font-size:14px;font-weight:600;padding:8px 14px;border:1.5px solid var(--blue);border-radius:var(--rad);background:var(--blue-bg);color:var(--blue-text);cursor:pointer;min-width:280px}
+.copacker-bar .cb-hint{font-size:11.5px;color:var(--text3)}
+.upload-zone{background:var(--bg);border:1.5px dashed var(--border2);border-radius:var(--rad-lg);padding:14px 20px;margin-bottom:14px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:border-color .2s;flex-wrap:wrap}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--blue)}
+.upload-zone.drag{background:var(--blue-bg)}
+.upload-icon{width:38px;height:38px;border-radius:var(--rad);background:var(--blue-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.upload-icon svg{width:18px;height:18px;stroke:var(--blue);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.upload-text{flex:1;min-width:160px}
+.upload-title{font-size:13px;font-weight:600}
+.upload-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.upload-btn{font-size:12px;padding:6px 14px;border:0.5px solid var(--border2);border-radius:var(--rad);background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap}
+.upload-btn:hover{background:var(--bg2)}
+.status-bar{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rad-lg);padding:12px 18px;margin-bottom:14px;display:none;align-items:center;gap:12px}
+.status-bar.visible{display:flex}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--amber)}
+.status-dot.ok{background:var(--green)}
+.status-dot.err{background:var(--red)}
+.status-dot.loading{animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.status-msg{font-size:13px;color:var(--text)}
+.status-sub{font-size:11px;color:var(--text2)}
+.tab-bar{display:flex;gap:4px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rad-lg);padding:5px;margin-bottom:14px;flex-wrap:wrap}
+.tab{border:none;background:transparent;color:var(--text2);font-size:13px;font-weight:500;padding:9px 16px;border-radius:var(--rad);cursor:pointer;transition:.15s}
+.tab:hover{background:var(--bg2);color:var(--text)}
+.tab.active{background:var(--navy);color:#fff}
+.page{display:none}
+.page.active{display:block}
+.kgrid{display:grid;gap:10px;margin-bottom:14px}
+.kgrid5{grid-template-columns:repeat(5,1fr)}
+.kgrid4{grid-template-columns:repeat(4,1fr)}
+.kgrid3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.kgrid5,.kgrid4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.kgrid5,.kgrid4,.kgrid3{grid-template-columns:1fr}}
+.kpi{background:var(--bg);border:0.5px solid var(--border);border-top:3px solid var(--border2);border-radius:var(--rad-lg);padding:14px 16px}
+.kpi.pos{border-top-color:var(--green)}
+.kpi.neg{border-top-color:var(--red)}
+.kpi-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.kpi-val{font-size:21px;font-weight:600;margin-top:5px}
+.kpi-val.pos{color:var(--green-text)}
+.kpi-val.neg{color:var(--red-text)}
+.kpi-sub{font-size:11px;color:var(--text3);margin-top:3px}
+.card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rad-lg);padding:18px 20px;margin-bottom:14px}
+.card-title{font-size:14px;font-weight:600}
+.card-sub{font-size:11.5px;color:var(--text2);margin-top:2px;margin-bottom:12px}
+.sw{overflow-x:auto}
+table.dt{width:100%;border-collapse:collapse;font-size:12.5px}
+table.dt thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--text2);border-bottom:1.5px solid var(--border2);padding:7px 10px;white-space:nowrap}
+table.dt tbody td{padding:8px 10px;border-bottom:0.5px solid var(--border);white-space:nowrap}
+table.dt tbody tr:hover{background:var(--bg2)}
+table.dt tbody tr.total-row{font-weight:700;background:var(--bg2)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.pos-text{color:var(--green-text)}
+.neg-text{color:var(--red-text)}
+.pill{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:99px}
+.pill-mensual{background:var(--blue-bg);color:var(--blue-text)}
+.pill-trimestral{background:var(--amber-bg);color:var(--amber-text)}
+.subtabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.subtab{border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);font-size:12px;font-weight:500;padding:6px 13px;border-radius:99px;cursor:pointer}
+.subtab:hover{background:var(--bg2)}
+.subtab.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+.cal-table td,.cal-table th{text-align:center}
+.cal-table td:first-child,.cal-table th:first-child{text-align:left}
+.cal-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--blue)}
+.cal-dot.q{background:var(--amber)}
+.cal-skip{color:var(--border2)}
+.cal-row-highlight{background:var(--blue-bg)}
+.note{font-size:11.5px;color:var(--red-text);font-style:italic}
+.fn{font-size:11px;color:var(--text3);margin-top:8px;line-height:1.6}
+.chart-wrap{position:relative;height:260px}
+.legend-row{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--text2);margin-bottom:10px}
+.legend-item{display:flex;align-items:center;gap:6px}
+.legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+.search-box{width:100%;max-width:280px;font-size:12.5px;padding:7px 11px;border:0.5px solid var(--border2);border-radius:var(--rad);margin-bottom:12px;background:var(--bg);color:var(--text)}
+.empty-note{font-size:12.5px;color:var(--text3);padding:20px 0;text-align:center}
+footer{text-align:center;font-size:11px;color:var(--text3);margin-top:20px}
+.print-btn{margin-top:8px;font-size:11.5px;font-weight:600;padding:6px 13px;border:1px solid rgba(255,255,255,.4);border-radius:99px;background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
+.print-btn:hover{background:rgba(255,255,255,.18)}
+.exec-card{background:linear-gradient(135deg,var(--navy),#123a63);color:#fff;border-radius:var(--rad-lg);padding:20px 24px;margin-bottom:14px}
+.exec-card .card-title{color:#fff;font-size:14px}
+.exec-card ul{margin:10px 0 0 18px;font-size:13px;line-height:1.8}
+.exec-card li strong{color:#fff}
+.kpi-val .exact{display:block;font-size:10.5px;font-weight:400;color:var(--text3);margin-top:2px}
+.kpi-val .exact.fx{color:var(--blue-text);font-weight:600}
+.chk-cell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;cursor:pointer;border:1.5px solid var(--border2);background:var(--bg)}
+.chk-cell input{position:absolute;opacity:0;width:100%;height:100%;cursor:pointer;margin:0}
+.chk-cell svg{width:13px;height:13px;stroke:#fff;stroke-width:3;fill:none;opacity:0;transition:opacity .1s}
+.chk-cell.due{border-color:var(--blue)}
+.chk-cell.due-q{border-color:var(--amber)}
+.chk-cell.checked{background:var(--green);border-color:var(--green)}
+.chk-cell.checked svg{opacity:1}
+.cal-progress{font-size:9.5px;color:var(--text3);margin-left:5px}
+@media print {
+  .no-print, .tab-bar, .subtabs, .search-box { display:none !important; }
+  body{background:#fff}
+  .shell{max-width:100%;padding:0}
+  .card, .kpi { break-inside: avoid; border:1px solid #ccc; }
+  .header{ background:#0c2d52 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .page{display:none !important}
+  .page.active{display:block !important}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="header">
+    <div>
+      <div class="header-title">Control de Inventarios en Copackers</div>
+      <div class="header-sub" id="headerSub">Cargando datos…</div>
+    </div>
+    <div class="header-meta">
+      <strong id="headerMesActivo">—</strong>
+      Mes activo (último con datos)
+      <button class="print-btn no-print" onclick="window.print()">Imprimir / Exportar PDF</button>
+    </div>
+  </div>
+
+  <div class="upload-zone no-print" id="upZone" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="onDrop(event)">
+    <div class="upload-icon">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    </div>
+    <div class="upload-text">
+      <div class="upload-title">Actualizar datos del mes</div>
+      <div class="upload-sub">Subí el Excel del tablero (con las fórmulas recalculadas). Se publica para todos automáticamente.</div>
+    </div>
+    <button class="upload-btn" onclick="document.getElementById('fInput').click()">Seleccionar archivo</button>
+    <input type="file" id="fInput" accept=".xlsx,.xls" style="display:none" onchange="handleFile(event)">
+  </div>
+
+  <div class="status-bar no-print" id="statusBar">
+    <div class="status-dot" id="statusDot"></div>
+    <div style="flex:1">
+      <div class="status-msg" id="statusMsg"></div>
+      <div class="status-sub" id="statusSub"></div>
+    </div>
+  </div>
+
+  <div class="copacker-bar">
+    <label for="copackerSel">Copacker</label>
+    <select id="copackerSel" onchange="onCopackerChange()">
+      <option value="Todos">Todos</option>
+    </select>
+    <span class="cb-hint">Filtra Resumen, Evolución mensual y Top 20 · el Cronograma de conteos se ve siempre completo</span>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="showPage('resumen',this)">Resumen</button>
+    <button class="tab" onclick="showPage('evolucion',this)">Evolución mensual</button>
+    <button class="tab" onclick="showPage('top20',this)">Top 20 materiales</button>
+    <button class="tab" onclick="showPage('cronograma',this)">Cronograma de conteos</button>
+  </div>
+
+  <!-- RESUMEN -->
+  <div id="page-resumen" class="page active">
+    <div class="exec-card">
+      <div class="card-title">Resumen ejecutivo</div>
+      <ul id="execSummary"><li>Cargando…</li></ul>
+    </div>
+    <p class="fn" style="margin-bottom:14px">⚠ El último ajuste del material <strong>418025001 — BTL-PET Tube 39,5g SMI (PLASTICOS DEL FUTURO SA)</strong> está en revisión y fue excluido de este reporte.</p>
+    <div class="kgrid kgrid4">
+      <div class="kpi" id="kpiConsumos"><div class="kpi-label">Consumos totales (año)</div><div class="kpi-val" id="vConsumos">—</div><div class="kpi-sub" id="vConsumosSub">—</div></div>
+      <div class="kpi" id="kpiAjustes"><div class="kpi-label">Ajustes totales (año)</div><div class="kpi-val" id="vAjustes">—</div><div class="kpi-sub" id="vAjustesSub">—</div></div>
+      <div class="kpi" id="kpiIndice"><div class="kpi-label">% Índice de ajuste (año)</div><div class="kpi-val" id="vIndice">—</div><div class="kpi-sub">Ajustes ÷ Consumos</div></div>
+      <div class="kpi"><div class="kpi-label">% Ajuste s/ Stock Promedio (año)</div><div class="kpi-val" id="vStockFin">—</div><div class="kpi-sub" id="vStockFinSub">—</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" id="mesActivoTitle">Mes activo</div>
+      <div class="card-sub">Últimos datos cargados para el copacker seleccionado</div>
+      <div class="kgrid kgrid5" style="margin-bottom:0">
+        <div class="kpi"><div class="kpi-label">Ajustes</div><div class="kpi-val" id="mAjustes">—</div></div>
+        <div class="kpi"><div class="kpi-label">Consumo</div><div class="kpi-val" id="mConsumo">—</div></div>
+        <div class="kpi"><div class="kpi-label">% Índice Ajuste Consumo</div><div class="kpi-val" id="mIndiceConsumo">—</div></div>
+        <div class="kpi"><div class="kpi-label">Stock</div><div class="kpi-val" id="mStock">—</div></div>
+        <div class="kpi"><div class="kpi-label">% Índice Ajuste Stock</div><div class="kpi-val" id="mIndiceStock">—</div></div>
+      </div>
+    </div>
+
+    <div class="card" id="cardCopackerBreakdown">
+      <div class="card-title">Ajustes por Copacker — 2026 ($)</div>
+      <div class="card-sub">Ordenado de mayor a menor ajuste absoluto</div>
+      <div class="chart-wrap" id="cCopackerWrap" style="height:560px;margin-bottom:16px"><canvas id="cCopacker"></canvas></div>
+      <div class="sw"><table class="dt" id="tCopacker"><thead><tr><th>Copacker</th><th class="num">Ajuste $ (2026)</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- EVOLUCION -->
+  <div id="page-evolucion" class="page">
+    <div class="card">
+      <div class="card-title" id="evoTitle1">Evolución mensual — Ajustes y Consumo</div>
+      <div class="card-sub">Enero a diciembre · $ pesos</div>
+      <div class="legend-row">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>Ajustes</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--text3)"></span>Consumo</div>
+      </div>
+      <div class="chart-wrap"><canvas id="cEvoAjusteConsumo"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title" id="evoTitle2">Evolución mensual — Stock e Índice de Ajuste</div>
+      <div class="legend-row">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Stock</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--amber)"></span>% Índice Ajuste Stock</div>
+      </div>
+      <div class="chart-wrap"><canvas id="cEvoStock"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Detalle mensual</div>
+      <div class="sw"><table class="dt" id="tEvo"><thead><tr><th>AñoMes</th><th class="num">Ajustes $</th><th class="num">Consumo $</th><th class="num">% Índice Ajuste Consumo</th><th class="num">Stock $</th><th class="num">% Índice Ajuste Stock</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- TOP 20 -->
+  <div id="page-top20" class="page">
+    <div class="subtabs">
+      <button class="subtab active" onclick="showTop20('negativo',this)">Mayor ajuste negativo (2026)</button>
+      <button class="subtab" onclick="showTop20('positivo',this)">Mayor ajuste positivo (2026)</button>
+      <button class="subtab" onclick="showTop20('absoluto',this)">Valor absoluto (2026)</button>
+      <button class="subtab" onclick="showTop20('todo_periodo',this)">Todo el período</button>
+    </div>
+    <div class="card">
+      <div class="card-title" id="top20Title">—</div>
+      <div class="card-sub" id="top20Sub">—</div>
+      <input type="text" class="search-box" id="top20Search" placeholder="Buscar código, descripción o copacker…" oninput="renderTop20()">
+      <div class="sw"><table class="dt" id="tTop20"><thead><tr><th>#</th><th>Código</th><th>Descripción</th><th>Copacker</th><th class="num">Ajuste $</th><th>UM</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <p class="fn">"Mixta (verificar)": el material tiene más de una unidad de medida cargada en los movimientos de origen — se recomienda validar contra el sistema antes de usar la cifra para conversiones físicas.</p>
+    <p class="fn">⚠ El último ajuste del material 418025001 — BTL-PET Tube 39,5g SMI (PLASTICOS DEL FUTURO SA) está en revisión y fue excluido de estos rankings.</p>
+  </div>
+
+  <!-- CRONOGRAMA -->
+  <div id="page-cronograma" class="page">
+    <div class="card">
+      <div class="card-title">Cronograma de conteos 2026</div>
+      <div class="card-sub">Tildá el mes en que se realizó el conteo físico de cada copacker · la fila seleccionada arriba queda resaltada</div>
+      <div class="legend-row">
+        <div class="legend-item"><span class="chk-cell due" style="width:14px;height:14px"></span>Mes programado — Mensual</div>
+        <div class="legend-item"><span class="chk-cell due-q" style="width:14px;height:14px"></span>Mes programado — Trimestral</div>
+        <div class="legend-item"><span class="chk-cell checked" style="width:14px;height:14px"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></span>Conteo realizado</div>
+        <button class="subtab no-print" style="margin-left:auto" onclick="resetCronograma()">Borrar marcas</button>
+      </div>
+      <div class="sw"><table class="dt cal-table" id="tCronograma"><thead><tr><th>Copacker</th><th>Frecuencia</th><th>Ene</th><th>Feb</th><th>Mar</th><th>Abr</th><th>May</th><th>Jun</th><th>Jul</th><th>Ago</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dic</th><th>Notas</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <p class="fn">El borde azul/ámbar marca el mes en que corresponde contar según la frecuencia asignada; podés tildar cualquier mes igual si se hizo un conteo extra. Las marcas se guardan en este navegador (localStorage) — si abrís el archivo desde otra PC o navegador, no se van a ver las marcas de acá. Trimestral asume arranque en enero.</p>
+  </div>
+
+  <footer>Generado a partir del tablero de control de inventarios en copackers · Datos al Julio 2026</footer>
+</div>
+
+<script>
+let DATA = null;
+const MESES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const MESES_LARGO = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+let charts = {};
+
+function fmt$(v) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  const n = Math.round(v);
+  const s = Math.abs(n).toLocaleString('es-AR');
+  return (n < 0 ? '($' : '$') + s + (n < 0 ? ')' : '');
+}
+function fmtPct(v) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return (v*100).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '%';
+}
+function signClass(v) { return v < 0 ? 'neg-text' : (v > 0 ? 'pos-text' : ''); }
+function signClassKpi(v) { return v < 0 ? 'neg' : (v > 0 ? 'pos' : ''); }
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function fmt$Short(v) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  const abs = Math.abs(v);
+  let s;
+  if (abs >= 1e9) s = (abs/1e9).toLocaleString('es-AR',{maximumFractionDigits:1}) + ' MM';
+  else if (abs >= 1e6) s = (abs/1e6).toLocaleString('es-AR',{maximumFractionDigits:1}) + ' M';
+  else if (abs >= 1e3) s = (abs/1e3).toLocaleString('es-AR',{maximumFractionDigits:0}) + ' mil';
+  else s = Math.round(abs).toLocaleString('es-AR');
+  return (v < 0 ? '($' : '$') + s + (v < 0 ? ')' : '');
+}
+const FX_JUNIO_2026 = 1450.32; // ARS por USD, reportado por Finanzas
+function fmtUSD(v) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  const usd = v / FX_JUNIO_2026;
+  const abs = Math.abs(usd);
+  let s;
+  if (abs >= 1e6) s = (abs/1e6).toLocaleString('es-AR',{maximumFractionDigits:1}) + ' M';
+  else if (abs >= 1e3) s = (abs/1e3).toLocaleString('es-AR',{maximumFractionDigits:1}) + ' mil';
+  else s = abs.toLocaleString('es-AR',{maximumFractionDigits:0});
+  return (usd < 0 ? '(US$' : 'US$') + s + (usd < 0 ? ')' : '');
+}
+function setKpi(id, value) {
+  const el = document.getElementById(id);
+  el.innerHTML = fmt$Short(value) + '<span class="exact fx">' + fmtUSD(value) + '</span>';
+}
+
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function onCopackerChange() {
+  renderResumen();
+  renderEvolucion();
+  renderTop20();
+  renderCronograma();
+}
+
+let currentTop20 = 'negativo';
+function showTop20(key, btn) {
+  currentTop20 = key;
+  document.querySelectorAll('.subtabs .subtab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('top20Search').value = '';
+  renderTop20();
+}
+
+function renderTop20() {
+  const cop = document.getElementById('copackerSel').value;
+  const table = DATA.top20[cop][currentTop20];
+  document.getElementById('top20Title').textContent = table.title + (cop === 'Todos' ? '' : ' — ' + cop);
+  const subs = {
+    negativo: 'Los mayores ajustes negativos (faltantes) del año activo, en $ con signo.',
+    positivo: 'Los mayores ajustes positivos (excedentes) del año activo, en $ con signo.',
+    absoluto: 'Los movimientos de mayor magnitud del año activo, sin importar el signo.',
+    todo_periodo: 'Ranking histórico completo (todos los meses cargados), por valor absoluto de ajuste.'
+  };
+  document.getElementById('top20Sub').textContent = subs[currentTop20] || '';
+  const q = document.getElementById('top20Search').value.trim().toLowerCase();
+  const rows = table.rows.filter(r => {
+    if (!q) return true;
+    return String(r.codigo).toLowerCase().includes(q)
+      || (r.descripcion||'').toLowerCase().includes(q)
+      || (r.copacker||'').toLowerCase().includes(q);
+  });
+  const tbody = document.querySelector('#tTop20 tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-note">Sin materiales para este copacker en esta vista.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `<tr>
+    <td>${r.rank}</td>
+    <td>${r.codigo}</td>
+    <td>${r.descripcion || ''}</td>
+    <td>${r.copacker || ''}</td>
+    <td class="num ${signClass(r.monto)}">${fmt$(r.monto)}</td>
+    <td>${r.um === 'Mixta (verificar)' ? '<span class="note">'+r.um+'</span>' : (r.um || '—')}</td>
+  </tr>`).join('');
+}
+
+function renderExecSummary(cop, k) {
+  const items = [];
+  const anio = DATA.anio_activo;
+  if (k.ajustes_totales_anio < 0) {
+    items.push(`El ajuste acumulado de <strong>${anio}</strong> es <strong>${fmt$(k.ajustes_totales_anio)}</strong> (faltante neto) — equivale a <strong>${fmtPct(Math.abs(k.indice_ajuste_anio))}</strong> del consumo del período.`);
+  } else if (k.ajustes_totales_anio > 0) {
+    items.push(`El ajuste acumulado de <strong>${anio}</strong> es <strong>${fmt$(k.ajustes_totales_anio)}</strong> (excedente neto) — equivale a <strong>${fmtPct(Math.abs(k.indice_ajuste_anio))}</strong> del consumo del período.`);
+  } else {
+    items.push(`No hay ajuste neto acumulado en ${anio} para esta vista.`);
+  }
+
+  if (cop === 'Todos') {
+    const sorted = [...DATA.ajustes_por_copacker].sort((a,b) => Math.abs(b.ajuste) - Math.abs(a.ajuste));
+    const top = sorted[0];
+    if (top) items.push(`El copacker con mayor desvío es <strong>${top.copacker}</strong>, con un ajuste de <strong>${fmt$(top.ajuste)}</strong> en ${anio}.`);
+  } else {
+    items.push(`Mes activo (${DATA.mes_activo}): ajuste de <strong>${fmt$(k.kpi_mes.ajustes)}</strong> sobre un consumo de <strong>${fmt$(k.kpi_mes.consumo)}</strong>.`);
+  }
+
+  items.push(`Tipo de cambio de referencia: <strong>FX Junio ${anio} = $${FX_JUNIO_2026.toLocaleString('es-AR')}</strong> (Finanzas) — el ajuste acumulado equivale a <strong>${fmtUSD(k.ajustes_totales_anio)}</strong>.`);
+
+  document.getElementById('execSummary').innerHTML = items.map(t => `<li>${t}</li>`).join('');
+}
+
+function renderResumen() {
+  const cop = document.getElementById('copackerSel').value;
+  const k = DATA.sections[cop];
+  document.getElementById('mesActivoTitle').textContent = 'Mes activo — ' + "Julio 2026" + (cop === 'Todos' ? '' : ' — ' + cop);
+
+  setKpi('vConsumos', k.consumos_totales, true);
+  document.getElementById('vConsumos').className = 'kpi-val ' + signClass(k.consumos_totales);
+  document.getElementById('vConsumosSub').textContent = 'Consumo de producción, ' + DATA.anio_activo;
+  setKpi('vAjustes', k.ajustes_totales_anio, true);
+  document.getElementById('vAjustes').className = 'kpi-val ' + signClass(k.ajustes_totales_anio);
+  document.getElementById('kpiAjustes').className = 'kpi ' + signClassKpi(k.ajustes_totales_anio);
+  document.getElementById('vAjustesSub').textContent = (cop === 'Todos' ? 'Todos los copackers' : cop) + ', ' + DATA.anio_activo;
+  document.getElementById('vIndice').textContent = fmtPct(k.indice_ajuste_anio);
+  document.getElementById('vIndice').className = 'kpi-val ' + signClass(k.indice_ajuste_anio);
+  document.getElementById('vStockFin').textContent = fmtPct(k.indice_ajuste_stock_promedio);
+  document.getElementById('vStockFin').className = 'kpi-val ' + signClass(k.indice_ajuste_stock_promedio);
+  document.getElementById('vStockFinSub').textContent = 'Ajuste ÷ Stock promedio ' + DATA.anio_activo + ' (' + fmt$(k.stock_promedio_ytd) + ')';
+  renderExecSummary(cop, k);
+
+  setKpi('mAjustes', k.kpi_mes.ajustes, true);
+  document.getElementById('mAjustes').className = 'kpi-val ' + signClass(k.kpi_mes.ajustes);
+  setKpi('mConsumo', k.kpi_mes.consumo, true);
+  document.getElementById('mConsumo').className = 'kpi-val ' + signClass(k.kpi_mes.consumo);
+  document.getElementById('mIndiceConsumo').textContent = fmtPct(k.kpi_mes.indice_consumo);
+  document.getElementById('mIndiceConsumo').className = 'kpi-val ' + signClass(k.kpi_mes.indice_consumo);
+  setKpi('mStock', k.kpi_mes.stock, true);
+  document.getElementById('mIndiceStock').textContent = fmtPct(k.kpi_mes.indice_stock);
+  document.getElementById('mIndiceStock').className = 'kpi-val ' + signClass(k.kpi_mes.indice_stock);
+
+  const breakdownCard = document.getElementById('cardCopackerBreakdown');
+  if (cop !== 'Todos') { breakdownCard.style.display = 'none'; renderResumen._skipChart = true; return; }
+  breakdownCard.style.display = '';
+
+  const copackers = [...DATA.ajustes_por_copacker].sort((a,b) => Math.abs(b.ajuste) - Math.abs(a.ajuste));
+  const tbody = document.querySelector('#tCopacker tbody');
+  tbody.innerHTML = copackers.map(c => `<tr><td>${c.copacker}</td><td class="num ${signClass(c.ajuste)}">${fmt$(c.ajuste)}</td></tr>`).join('')
+    + `<tr class="total-row"><td>TOTAL</td><td class="num ${signClass(DATA.ajustes_total)}">${fmt$(DATA.ajustes_total)}</td></tr>`;
+
+  const chartHeight = Math.max(280, copackers.length * 42);
+  document.getElementById('cCopackerWrap').style.height = chartHeight + 'px';
+  destroyChart('cCopacker');
+  charts['cCopacker'] = new Chart(document.getElementById('cCopacker'), {
+    type: 'bar',
+    data: {
+      labels: copackers.map(c => c.copacker.length > 34 ? c.copacker.slice(0,32)+'…' : c.copacker),
+      datasets: [{
+        data: copackers.map(c => c.ajuste),
+        backgroundColor: copackers.map(c => c.ajuste < 0 ? '#e24b4a' : (c.ajuste > 0 ? '#639922' : '#c8c7be')),
+        borderRadius: 3,
+        minBarLength: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmt$(ctx.raw) } } },
+      scales: {
+        x: { ticks: { callback: v => fmt$(v) } },
+        y: { ticks: { autoSkip: false, font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function renderEvolucion() {
+  const cop = document.getElementById('copackerSel').value;
+  const k = DATA.sections[cop];
+  const suffix = cop === 'Todos' ? '' : ' — ' + cop;
+  document.getElementById('evoTitle1').textContent = 'Evolución mensual ' + DATA.anio_activo + ' — Ajustes y Consumo' + suffix;
+  document.getElementById('evoTitle2').textContent = 'Evolución mensual ' + DATA.anio_activo + ' — Stock e Índice de Ajuste' + suffix;
+
+  const evo = k.evolucion_mensual;
+  const labels = evo.map(e => MESES_ES[parseInt(e.mes.split('-')[1],10)-1]);
+  const tbody = document.querySelector('#tEvo tbody');
+  tbody.innerHTML = evo.map(e => `<tr>
+      <td>${e.mes}</td>
+      <td class="num ${signClass(e.ajustes)}">${fmt$(e.ajustes)}</td>
+      <td class="num ${signClass(e.consumo)}">${fmt$(e.consumo)}</td>
+      <td class="num ${signClass(e.indice_consumo)}">${fmtPct(e.indice_consumo)}</td>
+      <td class="num">${fmt$(e.stock)}</td>
+      <td class="num ${signClass(e.indice_stock)}">${fmtPct(e.indice_stock)}</td>
+    </tr>`).join('')
+    + `<tr class="total-row"><td>Total año (Stock = prom.)</td>
+      <td class="num ${signClass(k.evolucion_total.ajustes)}">${fmt$(k.evolucion_total.ajustes)}</td>
+      <td class="num ${signClass(k.evolucion_total.consumo)}">${fmt$(k.evolucion_total.consumo)}</td>
+      <td class="num ${signClass(k.evolucion_total.indice_consumo)}">${fmtPct(k.evolucion_total.indice_consumo)}</td>
+      <td class="num" title="Promedio de stock de los meses con datos, no una suma">${fmt$(k.evolucion_total.stock)}</td>
+      <td class="num ${signClass(k.evolucion_total.indice_stock)}">${fmtPct(k.evolucion_total.indice_stock)}</td>
+    </tr>`;
+
+  destroyChart('cEvoAjusteConsumo');
+  charts['cEvoAjusteConsumo'] = new Chart(document.getElementById('cEvoAjusteConsumo'), {
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar', label: 'Ajustes', data: evo.map(e => e.ajustes), backgroundColor: '#185fa5', order: 2 },
+        { type: 'line', label: 'Consumo', data: evo.map(e => e.consumo), borderColor: '#8a8a84', backgroundColor: '#8a8a84', tension: .3, order: 1, yAxisID: 'y1' }
+      ]
+    },
+    options: {
+      interaction: { mode: 'index', intersect: false },
+      plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt$(ctx.raw) } } },
+      scales: {
+        y: { ticks: { callback: v => fmt$(v) }, title: { display: true, text: 'Ajustes $' } },
+        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => fmt$(v) }, title: { display: true, text: 'Consumo $' } }
+      }
+    }
+  });
+
+  destroyChart('cEvoStock');
+  charts['cEvoStock'] = new Chart(document.getElementById('cEvoStock'), {
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar', label: 'Stock', data: evo.map(e => e.stock), backgroundColor: '#639922', order: 2 },
+        { type: 'line', label: '% Índice Ajuste Stock', data: evo.map(e => e.indice_stock*100), borderColor: '#ef9f27', backgroundColor: '#ef9f27', tension: .3, order: 1, yAxisID: 'y1' }
+      ]
+    },
+    options: {
+      interaction: { mode: 'index', intersect: false },
+      plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label.includes('Índice') ? ('% Índice: ' + ctx.raw.toFixed(2) + '%') : ('Stock: ' + fmt$(ctx.raw)) } } },
+      scales: {
+        y: { ticks: { callback: v => fmt$(v) }, title: { display: true, text: 'Stock $' } },
+        y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => v.toFixed(1) + '%' }, title: { display: true, text: '% Índice Ajuste Stock' } }
+      }
+    }
+  });
+}
+
+function shouldCount(freq, monthIdx) {
+  if (freq === 'Mensual') return true;
+  if (freq === 'Trimestral') return monthIdx % 3 === 0;
+  return false;
+}
+
+let cronoState = {};
+async function cronoLoadRemote() {
+  try {
+    const r = await fetch('/.netlify/functions/get-conteos');
+    cronoState = r.ok ? await r.json() : {};
+  } catch (e) { cronoState = {}; }
+}
+async function cronoSaveRemote() {
+  try {
+    await fetch('/.netlify/functions/save-conteos', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cronoState),
+    });
+  } catch (e) { /* se ignora: el estado local ya se actualizó */ }
+}
+function cronoKey(copacker, monthIdx) { return copacker + '::' + monthIdx; }
+function cronoToggle(copacker, monthIdx) {
+  const k = cronoKey(copacker, monthIdx);
+  cronoState[k] = !cronoState[k];
+  renderCronograma();
+  cronoSaveRemote();
+}
+async function resetCronograma() {
+  if (!confirm('¿Borrar todas las marcas de conteo? Esto afecta a todos los que ven el tablero.')) return;
+  cronoState = {};
+  renderCronograma();
+  await cronoSaveRemote();
+}
+
+function renderCronograma() {
+  const cop = document.getElementById('copackerSel').value;
+  const state = cronoState;
+  const tbody = document.querySelector('#tCronograma tbody');
+  tbody.innerHTML = DATA.cronograma.map(row => {
+    const pillClass = row.frecuencia === 'Mensual' ? 'pill-mensual' : 'pill-trimestral';
+    let doneCount = 0, dueCount = 0;
+    const cells = MESES_ES.map((m, i) => {
+      const due = shouldCount(row.frecuencia, i);
+      if (due) dueCount++;
+      const checked = !!state[cronoKey(row.copacker, i)];
+      if (checked) doneCount++;
+      const dueClass = due ? (row.frecuencia === 'Trimestral' ? 'due-q' : 'due') : '';
+      return `<td><label class="chk-cell ${dueClass} ${checked ? 'checked' : ''}" title="${row.copacker} · ${m}">
+        <input type="checkbox" ${checked ? 'checked' : ''} onchange="cronoToggle('${row.copacker.replace(/'/g, "\\'")}', ${i})">
+        <svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg>
+      </label></td>`;
+    }).join('');
+    const highlight = (cop !== 'Todos' && row.copacker === cop) ? ' cal-row-highlight' : '';
+    return `<tr class="${highlight}">
+      <td>${row.copacker}</td>
+      <td><span class="pill ${pillClass}">${row.frecuencia}</span><span class="cal-progress">${doneCount}/${dueCount} programados</span></td>
+      ${cells}
+      <td>${row.nota ? '<span class="note">'+row.nota+'</span>' : ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ================= Carga de datos (compartida) y subida de Excel ================= */
+
+function setStatus(kind, msg, sub) {
+  const bar = document.getElementById('statusBar');
+  const dot = document.getElementById('statusDot');
+  bar.classList.add('visible');
+  dot.className = 'status-dot' + (kind ? ' ' + kind : '');
+  document.getElementById('statusMsg').textContent = msg;
+  document.getElementById('statusSub').textContent = sub || '';
+}
+
+function populateCopackerSelect() {
+  const sel = document.getElementById('copackerSel');
+  const current = sel.value;
+  sel.innerHTML = '<option value="Todos">Todos</option>' +
+    DATA.copackers.map(c => `<option value="${c}">${c}</option>`).join('');
+  if ([...sel.options].some(o => o.value === current)) sel.value = current;
+}
+
+function updateHeader() {
+  document.getElementById('headerSub').textContent =
+    'Año activo: ' + DATA.anio_activo + ' · Fuente: BD Movimientos / BD Stocks SAP';
+  const mesActivo = DATA.mes_activo;
+  let label = mesActivo;
+  if (mesActivo) {
+    const [y, m] = mesActivo.split('-');
+    label = MESES_LARGO[parseInt(m, 10) - 1] + ' ' + y;
+  }
+  document.getElementById('headerMesActivo').textContent = label || '—';
+}
+
+function renderAll() {
+  populateCopackerSelect();
+  updateHeader();
+  onCopackerChange();
+}
+
+async function loadRemoteData() {
+  setStatus('loading', 'Cargando el último tablero publicado…');
+  try {
+    const r = await fetch('/.netlify/functions/get-tablero');
+    if (r.ok) {
+      DATA = await r.json();
+      await cronoLoadRemote();
+      renderAll();
+      setStatus('ok', 'Datos actualizados', 'Mes activo: ' + (DATA.mes_activo || '—'));
+    } else if (r.status === 404) {
+      setStatus('err', 'Todavía no se subió ningún Excel', 'Usá el cuadro de arriba para subir el primero.');
+    } else {
+      setStatus('err', 'No se pudo cargar el tablero (' + r.status + ')');
+    }
+  } catch (e) {
+    setStatus('err', 'Sin conexión con el servidor', String(e && e.message || e));
+  }
+}
+
+function onDrop(ev) {
+  ev.preventDefault();
+  document.getElementById('upZone').classList.remove('drag');
+  const file = ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if (file) processFile(file);
+}
+function handleFile(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (file) processFile(file);
+}
+
+async function processFile(file) {
+  setStatus('loading', 'Leyendo ' + file.name + '…');
+  try {
+    const buf = await file.arrayBuffer();
+    const newData = buildDashboardData(buf);
+    setStatus('loading', 'Publicando para todos…');
+    const r = await fetch('/.netlify/functions/upload-tablero', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newData),
+    });
+    if (!r.ok) throw new Error('El servidor devolvió ' + r.status);
+    DATA = newData;
+    await cronoLoadRemote();
+    renderAll();
+    setStatus('ok', 'Tablero actualizado y publicado', 'Mes activo: ' + (DATA.mes_activo || '—'));
+  } catch (e) {
+    setStatus('err', 'No se pudo procesar el archivo', String(e && e.message || e));
+    console.error(e);
+  }
+  document.getElementById('fInput').value = '';
+}
+
+loadRemoteData();
+</script>
+
+</body>
+</html>
