@@ -2,7 +2,7 @@ const { getStore } = require('@netlify/blobs');
 
 exports.handler = async () => {
   try {
-    const store = getStore('tablero-copackers');
+    const store = getStore({ name: 'tablero-copackers', siteID: process.env.BLOBS_SITE_ID, token: process.env.BLOBS_TOKEN });
     const raw = await store.get('conteos');
     const data = raw ? JSON.parse(raw) : {};
     return {

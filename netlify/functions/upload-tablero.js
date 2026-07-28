@@ -11,7 +11,7 @@ exports.handler = async (event) => {
     if (!parsed || !parsed.sections || !parsed.top20) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Formato de datos inválido' }) };
     }
-    const store = getStore('tablero-copackers');
+    const store = getStore({ name: 'tablero-copackers', siteID: process.env.BLOBS_SITE_ID, token: process.env.BLOBS_TOKEN });
     await store.set('latest', payload, {
       metadata: { updatedAt: new Date().toISOString() }
     });
