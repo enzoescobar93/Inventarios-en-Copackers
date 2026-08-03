@@ -183,6 +183,13 @@ footer{text-align:center;font-size:11px;color:var(--text3);margin-top:20px}
     <span class="cb-hint">Filtra Resumen, Evolución mensual y Top 20 · el Cronograma de conteos se ve siempre completo</span>
   </div>
 
+  <div class="copacker-bar no-print" id="fxBar">
+    <label for="fxInput">FX de referencia (ARS/USD)</label>
+    <input type="number" id="fxInput" min="0" step="0.01" style="font-size:13px;font-weight:600;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--rad);background:var(--bg);color:var(--text);width:120px">
+    <button class="upload-btn" onclick="saveFx()">Guardar</button>
+    <span class="cb-hint" id="fxHint">Se usa para convertir los montos en $ a US$ en todo el tablero · lo puede editar cualquiera, queda igual para todos</span>
+  </div>
+
   <div class="tab-bar">
     <button class="tab active" onclick="showPage('resumen',this)">Resumen</button>
     <button class="tab" onclick="showPage('evolucion',this)">Evolución mensual</button>
@@ -196,7 +203,6 @@ footer{text-align:center;font-size:11px;color:var(--text3);margin-top:20px}
       <div class="card-title">Resumen ejecutivo</div>
       <ul id="execSummary"><li>Cargando…</li></ul>
     </div>
-    <p class="fn" style="margin-bottom:14px">⚠ El último ajuste del material <strong>418025001 — BTL-PET Tube 39,5g SMI (PLASTICOS DEL FUTURO SA)</strong> está en revisión y fue excluido de este reporte.</p>
     <div class="kgrid kgrid4">
       <div class="kpi" id="kpiConsumos"><div class="kpi-label">Consumos totales (año)</div><div class="kpi-val" id="vConsumos">—</div><div class="kpi-sub" id="vConsumosSub">—</div></div>
       <div class="kpi" id="kpiAjustes"><div class="kpi-label">Ajustes totales (año)</div><div class="kpi-val" id="vAjustes">—</div><div class="kpi-sub" id="vAjustesSub">—</div></div>
@@ -264,7 +270,6 @@ footer{text-align:center;font-size:11px;color:var(--text3);margin-top:20px}
       <div class="sw"><table class="dt" id="tTop20"><thead><tr><th>#</th><th>Código</th><th>Descripción</th><th>Copacker</th><th class="num">Ajuste $</th><th>UM</th></tr></thead><tbody></tbody></table></div>
     </div>
     <p class="fn">"Mixta (verificar)": el material tiene más de una unidad de medida cargada en los movimientos de origen — se recomienda validar contra el sistema antes de usar la cifra para conversiones físicas.</p>
-    <p class="fn">⚠ El último ajuste del material 418025001 — BTL-PET Tube 39,5g SMI (PLASTICOS DEL FUTURO SA) está en revisión y fue excluido de estos rankings.</p>
   </div>
 
   <!-- CRONOGRAMA -->
@@ -280,7 +285,7 @@ footer{text-align:center;font-size:11px;color:var(--text3);margin-top:20px}
       </div>
       <div class="sw"><table class="dt cal-table" id="tCronograma"><thead><tr><th>Copacker</th><th>Frecuencia</th><th>Ene</th><th>Feb</th><th>Mar</th><th>Abr</th><th>May</th><th>Jun</th><th>Jul</th><th>Ago</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dic</th><th>Notas</th></tr></thead><tbody></tbody></table></div>
     </div>
-    <p class="fn">El borde azul/ámbar marca el mes en que corresponde contar según la frecuencia asignada; podés tildar cualquier mes igual si se hizo un conteo extra. Las marcas se guardan en este navegador (localStorage) — si abrís el archivo desde otra PC o navegador, no se van a ver las marcas de acá. Trimestral asume arranque en enero.</p>
+    <p class="fn">El borde azul/ámbar marca el mes en que corresponde contar según la frecuencia asignada; podés tildar cualquier mes igual si se hizo un conteo extra. Las marcas se guardan en el servidor y son compartidas — cualquiera que entre al sitio, desde cualquier PC o navegador, ve las mismas marcas. Trimestral asume arranque en enero.</p>
   </div>
 
   <footer>Generado a partir del tablero de control de inventarios en copackers · Datos al Julio 2026</footer>
@@ -316,10 +321,10 @@ function fmt$Short(v) {
   else s = Math.round(abs).toLocaleString('es-AR');
   return (v < 0 ? '($' : '$') + s + (v < 0 ? ')' : '');
 }
-const FX_JUNIO_2026 = 1450.32; // ARS por USD, reportado por Finanzas
+let FX_REF = 1450.32; // ARS por USD · valor por defecto hasta que se cargue el remoto; editable desde la UI
 function fmtUSD(v) {
   if (v === null || v === undefined || isNaN(v)) return '—';
-  const usd = v / FX_JUNIO_2026;
+  const usd = v / FX_REF;
   const abs = Math.abs(usd);
   let s;
   if (abs >= 1e6) s = (abs/1e6).toLocaleString('es-AR',{maximumFractionDigits:1}) + ' M';
@@ -407,7 +412,7 @@ function renderExecSummary(cop, k) {
     items.push(`Mes activo (${DATA.mes_activo}): ajuste de <strong>${fmt$(k.kpi_mes.ajustes)}</strong> sobre un consumo de <strong>${fmt$(k.kpi_mes.consumo)}</strong>.`);
   }
 
-  items.push(`Tipo de cambio de referencia: <strong>FX Junio ${anio} = $${FX_JUNIO_2026.toLocaleString('es-AR')}</strong> (Finanzas) — el ajuste acumulado equivale a <strong>${fmtUSD(k.ajustes_totales_anio)}</strong>.`);
+  items.push(`Tipo de cambio de referencia: <strong>$${FX_REF.toLocaleString('es-AR')}</strong> por US$1 — el ajuste acumulado equivale a <strong>${fmtUSD(k.ajustes_totales_anio)}</strong>.`);
 
   document.getElementById('execSummary').innerHTML = items.map(t => `<li>${t}</li>`).join('');
 }
@@ -562,6 +567,40 @@ async function cronoSaveRemote() {
     });
   } catch (e) { /* se ignora: el estado local ya se actualizó */ }
 }
+async function fxLoadRemote() {
+  try {
+    const r = await fetch('/.netlify/functions/get-fx');
+    if (r.ok) {
+      const data = await r.json();
+      if (data && typeof data.value === 'number' && data.value > 0) FX_REF = data.value;
+    }
+  } catch (e) { /* se mantiene el valor por defecto */ }
+  const input = document.getElementById('fxInput');
+  if (input) input.value = FX_REF;
+}
+async function saveFx() {
+  const input = document.getElementById('fxInput');
+  const value = parseFloat(input.value);
+  const hint = document.getElementById('fxHint');
+  if (!isFinite(value) || value <= 0) {
+    hint.textContent = 'Ingresá un valor de FX válido (mayor a 0).';
+    return;
+  }
+  hint.textContent = 'Guardando…';
+  try {
+    const r = await fetch('/.netlify/functions/save-fx', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    });
+    if (!r.ok) throw new Error('El servidor devolvió ' + r.status);
+    FX_REF = value;
+    if (DATA) renderResumen();
+    hint.textContent = 'FX actualizado y publicado para todos.';
+  } catch (e) {
+    hint.textContent = 'No se pudo guardar el FX: ' + String(e && e.message || e);
+  }
+}
+
 function cronoKey(copacker, monthIdx) { return copacker + '::' + monthIdx; }
 function cronoToggle(copacker, monthIdx) {
   const k = cronoKey(copacker, monthIdx);
@@ -643,6 +682,7 @@ function renderAll() {
 
 async function loadRemoteData() {
   setStatus('loading', 'Cargando el último tablero publicado…');
+  fxLoadRemote();
   try {
     const r = await fetch('/.netlify/functions/get-tablero');
     if (r.ok) {
@@ -681,13 +721,9 @@ async function processFile(file) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newData),
     });
-    if (!r.ok) {
-      let detail = '';
-      try { detail = (await r.json()).error || ''; } catch (e) {}
-      throw new Error('El servidor devolvió ' + r.status + (detail ? ' — ' + detail : ''));
-    }
+    if (!r.ok) throw new Error('El servidor devolvió ' + r.status);
     DATA = newData;
-    await cronoLoadRemote();
+    await Promise.all([cronoLoadRemote(), fxLoadRemote()]);
     renderAll();
     setStatus('ok', 'Tablero actualizado y publicado', 'Mes activo: ' + (DATA.mes_activo || '—'));
   } catch (e) {
