@@ -7,12 +7,6 @@
 
 const ANIO_FIJO = null; // si es null, se autodetecta como el año del "mes activo"
 
-// Ajuste puntual excluido del análisis por pedido explícito (en revisión):
-// solo el movimiento de JUNIO 2026 de este material+copacker. Mayo 2026 se mantiene.
-const EXCLUDE_MONTH = [
-  { codigo: 418025001, copacker: 'PLASTICOS DEL FUTURO SA', year: 2026, month: 6 }
-];
-
 function ymKey(y, m) { return y + '-' + String(m).padStart(2, '0'); }
 
 function cellDateToYM(v) {
@@ -30,7 +24,7 @@ function sheetToAOA(ws) {
  * Columna A=Código, D=Copacker, F:X (idx 5..23, 0-based) = $ por mes.
  * Devuelve: { rows: [{codigo, copacker, vals:{ 'YYYY-MM': valor }}], months: ['YYYY-MM',...] }
  */
-function readResumenSheet(wb, sheetName, excludeList) {
+function readResumenSheet(wb, sheetName) {
   const ws = wb.Sheets[sheetName];
   if (!ws) return { rows: [], months: [] };
   const aoa = sheetToAOA(ws);
@@ -51,9 +45,6 @@ function readResumenSheet(wb, sheetName, excludeList) {
     dateCols.forEach(dc => {
       let v = row[dc.idx];
       if (typeof v !== 'number') v = 0;
-      const excl = excludeList && excludeList.find(e =>
-        e.codigo === codigo && e.copacker === copacker && e.year === dc.y && e.month === dc.m);
-      if (excl) v = 0;
       vals[ymKey(dc.y, dc.m)] = v;
     });
     rows.push({ codigo, copacker, vals });
@@ -188,7 +179,6 @@ function readResultados(wb) {
   const ws = wb.Sheets['Resultados'];
   if (!ws) return [];
   const aoa = sheetToAOA(ws);
-  const ADJUST = { '418025001::PLASTICOS DEL FUTURO SA': -12781849.32 };
   const rows = [];
   for (let r = 2; r < aoa.length; r++) { // fila 3 = idx 2
     const row = aoa[r];
@@ -196,19 +186,11 @@ function readResultados(wb) {
     const codigo = row[0]; // A
     if (codigo === null || codigo === undefined || codigo === '') continue;
     const copacker = row[5]; // F
-    let ajusteTotal = row[2] || 0;    // C
-    let ajusteAbsTotal = row[50] || 0; // AY (idx 50)
-    let ajusteNeto2026 = row[51] || 0; // AZ (idx 51)
-    let ajusteAbs2026 = row[52] || 0;  // BA (idx 52)
+    const ajusteTotal = row[2] || 0;    // C
+    const ajusteAbsTotal = row[50] || 0; // AY (idx 50)
+    const ajusteNeto2026 = row[51] || 0; // AZ (idx 51)
+    const ajusteAbs2026 = row[52] || 0;  // BA (idx 52)
     const um = row[53];                // BB (idx 53)
-    const key = codigo + '::' + copacker;
-    if (ADJUST[key] !== undefined) {
-      const delta = ADJUST[key];
-      ajusteTotal = ajusteTotal - delta;
-      ajusteAbsTotal = Math.abs(ajusteTotal);
-      ajusteNeto2026 = ajusteNeto2026 - delta;
-      ajusteAbs2026 = Math.abs(ajusteNeto2026);
-    }
     rows.push({
       codigo, descripcion: row[1], copacker,
       ajuste_total: ajusteTotal, ajuste_abs_total: ajusteAbsTotal,
@@ -258,10 +240,10 @@ function buildTop20Set(subset) {
 function buildDashboardData(arrayBuffer) {
   const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
 
-  const { rows: ajustesRows } = readResumenSheet(wb, 'Resumen Ajustes', EXCLUDE_MONTH);
-  const { rows: consumosRows } = readResumenSheet(wb, 'Resumen Consumos', null);
-  const { rows: stocksRows } = readResumenSheet(wb, 'Resumen Stocks', null);
-  const { rows: ingresosRows } = readResumenSheet(wb, 'Resumen ingresos', null);
+  const { rows: ajustesRows } = readResumenSheet(wb, 'Resumen Ajustes');
+  const { rows: consumosRows } = readResumenSheet(wb, 'Resumen Consumos');
+  const { rows: stocksRows } = readResumenSheet(wb, 'Resumen Stocks');
+  const { rows: ingresosRows } = readResumenSheet(wb, 'Resumen ingresos');
 
   const ajustesByCop = aggregateByCopacker(ajustesRows);
   const consumosByCop = aggregateByCopacker(consumosRows);
